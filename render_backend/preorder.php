@@ -6,10 +6,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit('Method not allowed');
 }
 
-$name = trim($_POST['name'] ?? '');
-$email = trim($_POST['email'] ?? '');
+$name    = trim($_POST['name'] ?? '');
+$email   = trim($_POST['email'] ?? '');
 $product = trim($_POST['product'] ?? '');
-$price = (float) ($_POST['price'] ?? 0);
+$price   = (float) ($_POST['price'] ?? 0);
 
 if ($name === '' || $email === '' || $product === '' || $price <= 0) {
     http_response_code(422);
@@ -37,7 +37,7 @@ $payload = [
                     'quantity' => 1
                 ]
             ],
-            'payment_method_types' => ['card'],
+            'payment_method_types' => ['qrph'],
             'success_url' => APP_URL . '/success.php',
             'cancel_url' => APP_URL . '/cancel.php'
         ]
@@ -46,8 +46,8 @@ $payload = [
 
 $options = [
     'http' => [
-        'method' => 'POST',
-        'header' => implode("\r\n", [
+        'method'  => 'POST',
+        'header'  => implode("\r\n", [
             'Accept: application/json',
             'Content-Type: application/json',
             'Authorization: Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':')
