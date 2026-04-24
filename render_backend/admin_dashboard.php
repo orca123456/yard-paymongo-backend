@@ -1,5 +1,6 @@
 <?php
 session_start();
+
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header("Location: admin_login.php");
     exit;
@@ -7,88 +8,144 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 
 require_once 'db.php';
 
-// ── Handle status update ───────────────────────────────────────────────────
 $statusMsg = '';
 
+$allowedStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+$allowedFilters = ['all', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+
+function e($value)
+{
+    return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
+}
+
+function js($value)
+{
+    return htmlspecialchars(json_encode($value, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP), ENT_QUOTES, 'UTF-8');
+}
+
+function orderValue($order, $key, $default = '')
+{
+    return $order[$key] ?? $default;
+}
+
+// Make sure preorders table exists
+try {
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS preorders (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(150) NOT NULL,
+            contact VARCHAR(50),
+            fb_link TEXT,
+            address TEXT,
+            product VARCHAR(150),
+            price NUMERIC(10, 2) DEFAULT 0,
+            notes TEXT,
+            payment_method VARCHAR(100),
+            order_status VARCHAR(30) DEFAULT 'pending',
+            payment_status VARCHAR(30) DEFAULT 'pending',
+            paymongo_checkout_id VARCHAR(150),
+            paymongo_payment_id VARCHAR(150),
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    ");
+} catch (PDOException $e) {
+    die("Table setup failed: " . $e->getMessage());
+}
+
+// Handle status update
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     $orderId = (int) ($_POST['order_id'] ?? 0);
     $newStatus = $_POST['order_status'] ?? '';
 
-    $allowed = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
-    if ($orderId > 0 && in_array($newStatus, $allowed, true)) {
-        $stmt = $conn->prepare("UPDATE preorders SET order_status = ? WHERE id = ?");
-        $stmt->bind_param("si", $newStatus, $orderId);
-        $stmt->execute();
-        $stmt->close();
+    if ($orderId > 0 && in_array($newStatus, $allowedStatuses, true)) {
+        $stmt = $pdo->prepare("
+            UPDATE preorders
+            SET order_status = :order_status,
+                updated_at = NOW()
+            WHERE id = :id
+        ");
 
-        $statusMsg = "Order #{$orderId} status updated to <strong>" . ucfirst($newStatus) . "</strong>.";
+        $stmt->execute([
+            ':order_status' => $newStatus,
+            ':id' => $orderId
+        ]);
+
+        $statusMsg = "Order #{$orderId} status updated to <strong>" . e(ucfirst($newStatus)) . "</strong>.";
     }
 }
 
-// ── Handle cancel order ────────────────────────────────────────────────────
+// Handle cancel order
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_order'])) {
     $orderId = (int) ($_POST['order_id'] ?? 0);
 
     if ($orderId > 0) {
-        $stmt = $conn->prepare("UPDATE preorders SET order_status = 'cancelled' WHERE id = ?");
-        $stmt->bind_param("i", $orderId);
-        $stmt->execute();
-        $stmt->close();
+        $stmt = $pdo->prepare("
+            UPDATE preorders
+            SET order_status = 'cancelled',
+                updated_at = NOW()
+            WHERE id = :id
+        ");
+
+        $stmt->execute([
+            ':id' => $orderId
+        ]);
 
         $statusMsg = "Order #{$orderId} has been marked as <strong>Cancelled</strong>.";
     }
 }
 
-// ── Fetch all orders ───────────────────────────────────────────────────────
+// Fetch all orders
 $filter = $_GET['filter'] ?? 'all';
 $search = trim($_GET['search'] ?? '');
 
-$allowedFilters = ['all', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
 if (!in_array($filter, $allowedFilters, true)) {
     $filter = 'all';
 }
 
 $where = [];
 $params = [];
-$types = '';
 
 if ($filter !== 'all') {
-    $where[] = "order_status = ?";
-    $types .= 's';
-    $params[] = $filter;
+    $where[] = "order_status = :filter";
+    $params[':filter'] = $filter;
 }
 
 if ($search !== '') {
-    $where[] = "(name LIKE ? OR product LIKE ? OR contact LIKE ?)";
-    $types .= 'sss';
-    $like = "%{$search}%";
-    $params[] = $like;
-    $params[] = $like;
-    $params[] = $like;
+    $where[] = "(name ILIKE :search_name OR product ILIKE :search_product OR contact ILIKE :search_contact)";
+    $params[':search_name'] = "%{$search}%";
+    $params[':search_product'] = "%{$search}%";
+    $params[':search_contact'] = "%{$search}%";
 }
 
 $sql = "SELECT * FROM preorders";
-if ($where) {
+
+if (!empty($where)) {
     $sql .= " WHERE " . implode(" AND ", $where);
 }
+
 $sql .= " ORDER BY created_at DESC";
 
-$stmt = $conn->prepare($sql);
-if ($params) {
-    $stmt->bind_param($types, ...$params);
-}
-$stmt->execute();
-$orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$orders = $stmt->fetchAll();
 
-// ── Order management stats only ────────────────────────────────────────────
-$totalOrders = (int) ($conn->query("SELECT COUNT(*) FROM preorders")->fetch_row()[0] ?? 0);
-$pendingCount = (int) ($conn->query("SELECT COUNT(*) FROM preorders WHERE order_status='pending'")->fetch_row()[0] ?? 0);
-$processingCount = (int) ($conn->query("SELECT COUNT(*) FROM preorders WHERE order_status='processing'")->fetch_row()[0] ?? 0);
-$deliveredCount = (int) ($conn->query("SELECT COUNT(*) FROM preorders WHERE order_status='delivered'")->fetch_row()[0] ?? 0);
-$cancelledCount = (int) ($conn->query("SELECT COUNT(*) FROM preorders WHERE order_status='cancelled'")->fetch_row()[0] ?? 0);
+// Stats
+$totalOrders = (int) $pdo->query("SELECT COUNT(*) FROM preorders")->fetchColumn();
 
-$conn->close();
+$countStmt = $pdo->prepare("SELECT COUNT(*) FROM preorders WHERE order_status = :status");
+
+$countStmt->execute([':status' => 'pending']);
+$pendingCount = (int) $countStmt->fetchColumn();
+
+$countStmt->execute([':status' => 'processing']);
+$processingCount = (int) $countStmt->fetchColumn();
+
+$countStmt->execute([':status' => 'delivered']);
+$deliveredCount = (int) $countStmt->fetchColumn();
+
+$countStmt->execute([':status' => 'cancelled']);
+$cancelledCount = (int) $countStmt->fetchColumn();
 
 $statusColors = [
     'pending' => '#f39c12',
@@ -98,15 +155,19 @@ $statusColors = [
     'delivered' => '#27ae60',
     'cancelled' => '#e74c3c',
 ];
+
+$adminUsername = $_SESSION['admin_username'] ?? 'Admin';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="15">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard – Yard Handicraft</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <style>
         :root {
             --pink: #e84393;
@@ -343,7 +404,7 @@ $statusColors = [
             width: 100%;
             border-collapse: collapse;
             font-size: 1.4rem;
-            min-width: 900px;
+            min-width: 950px;
         }
 
         thead tr {
@@ -558,6 +619,14 @@ $statusColors = [
             .page-wrap {
                 padding: 8rem 1rem 2rem;
             }
+
+            .topbar .brand {
+                font-size: 1.7rem;
+            }
+
+            .topbar .admin-badge {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -565,12 +634,18 @@ $statusColors = [
 <body>
 
     <div class="topbar">
-        <div class="brand">Yard Handicraft<span>.</span> <small
-                style="font-size:1.4rem;color:#999;font-weight:normal;margin-left:.5rem;">Admin</small></div>
+        <div class="brand">
+            Yard Handicraft<span>.</span>
+            <small style="font-size:1.4rem;color:#999;font-weight:normal;margin-left:.5rem;">Admin</small>
+        </div>
+
         <div class="right">
-            <span class="admin-badge"><i
-                    class="fas fa-user-shield"></i><?= htmlspecialchars($_SESSION['admin_username']) ?></span>
-            <a href="logout.php" class="btn-logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            <span class="admin-badge">
+                <i class="fas fa-user-shield"></i><?= e($adminUsername) ?>
+            </span>
+            <a href="logout.php" class="btn-logout">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
         </div>
     </div>
 
@@ -584,6 +659,7 @@ $statusColors = [
                     <h2><?= $totalOrders ?></h2>
                 </div>
             </div>
+
             <div class="stat-card">
                 <div class="icon orange"><i class="fas fa-clock"></i></div>
                 <div>
@@ -591,6 +667,7 @@ $statusColors = [
                     <h2><?= $pendingCount ?></h2>
                 </div>
             </div>
+
             <div class="stat-card">
                 <div class="icon purple"><i class="fas fa-gear"></i></div>
                 <div>
@@ -598,6 +675,7 @@ $statusColors = [
                     <h2><?= $processingCount ?></h2>
                 </div>
             </div>
+
             <div class="stat-card">
                 <div class="icon green"><i class="fas fa-check-circle"></i></div>
                 <div>
@@ -605,6 +683,7 @@ $statusColors = [
                     <h2><?= $deliveredCount ?></h2>
                 </div>
             </div>
+
             <div class="stat-card">
                 <div class="icon red"><i class="fas fa-ban"></i></div>
                 <div>
@@ -615,27 +694,34 @@ $statusColors = [
         </div>
 
         <?php if ($statusMsg): ?>
-            <div class="success-msg"><i class="fas fa-check-circle"></i> <?= $statusMsg ?></div>
+            <div class="success-msg">
+                <i class="fas fa-check-circle"></i> <?= $statusMsg ?>
+            </div>
         <?php endif; ?>
 
         <div class="pill-tabs">
-            <?php foreach (['all', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] as $f): ?>
-                <a href="?filter=<?= $f ?>&search=<?= urlencode($search) ?>"
+            <?php foreach ($allowedFilters as $f): ?>
+                <a href="?filter=<?= e($f) ?>&search=<?= urlencode($search) ?>"
                     class="pill-tab <?= $filter === $f ? 'active' : '' ?>">
-                    <?= ucfirst($f) ?>
+                    <?= e(ucfirst($f)) ?>
                 </a>
             <?php endforeach; ?>
         </div>
 
         <div class="toolbar">
             <form method="GET" action="">
-                <input type="hidden" name="filter" value="<?= htmlspecialchars($filter) ?>">
+                <input type="hidden" name="filter" value="<?= e($filter) ?>">
+
                 <div class="search-wrap">
                     <i class="fas fa-search"></i>
-                    <input type="text" name="search" value="<?= htmlspecialchars($search) ?>"
+                    <input type="text" name="search" value="<?= e($search) ?>"
                         placeholder="Search by name, product, contact…">
                 </div>
-                <button type="submit" class="btn-search"><i class="fas fa-filter"></i> Filter</button>
+
+                <button type="submit" class="btn-search">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+
                 <?php if ($search || $filter !== 'all'): ?>
                     <a href="admin_dashboard.php" class="btn-search" style="background:#aaa;">Clear</a>
                 <?php endif; ?>
@@ -651,58 +737,94 @@ $statusColors = [
                         <th>Product</th>
                         <th>Price</th>
                         <th>Payment Method</th>
-                        <th>Status</th>
+                        <th>Payment</th>
+                        <th>Order Status</th>
                         <th>Date</th>
                         <th>Action</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     <?php if (empty($orders)): ?>
                         <tr>
-                            <td colspan="8" class="no-orders">
+                            <td colspan="9" class="no-orders">
                                 <i class="fas fa-inbox" style="font-size:3rem;display:block;margin-bottom:1rem;"></i>
                                 No orders found.
                             </td>
                         </tr>
                     <?php else: ?>
-                        <?php foreach ($orders as $order):
-                            $color = $statusColors[$order['order_status']] ?? '#aaa';
+                        <?php foreach ($orders as $order): ?>
+                            <?php
+                            $id = (int) orderValue($order, 'id', 0);
+                            $name = orderValue($order, 'name', '');
+                            $contact = orderValue($order, 'contact', '');
+                            $fbLink = orderValue($order, 'fb_link', '');
+                            $address = orderValue($order, 'address', '');
+                            $product = orderValue($order, 'product', '');
+                            $price = (float) orderValue($order, 'price', 0);
+                            $notes = orderValue($order, 'notes', '');
+                            $paymentMethod = orderValue($order, 'payment_method', '');
+                            $paymentStatus = orderValue($order, 'payment_status', 'pending');
+                            $orderStatus = orderValue($order, 'order_status', 'pending');
+                            $createdAt = orderValue($order, 'created_at', '');
+
+                            $color = $statusColors[$orderStatus] ?? '#aaa';
                             ?>
                             <tr>
-                                <td><strong>#<?= (int) $order['id'] ?></strong></td>
+                                <td><strong>#<?= $id ?></strong></td>
+
                                 <td>
-                                    <?= htmlspecialchars($order['name']) ?>
-                                    <small><?= htmlspecialchars($order['contact']) ?></small>
+                                    <?= e($name) ?>
+                                    <small><?= e($contact) ?></small>
                                 </td>
-                                <td><?= htmlspecialchars($order['product']) ?></td>
-                                <td style="color:var(--pink);font-weight:bold;">₱<?= number_format((float) $order['price'], 2) ?>
+
+                                <td><?= e($product) ?></td>
+
+                                <td style="color:var(--pink);font-weight:bold;">
+                                    ₱<?= number_format($price, 2) ?>
                                 </td>
-                                <td><?= htmlspecialchars($order['payment_method'] ?: '—') ?></td>
+
+                                <td><?= e($paymentMethod ?: '—') ?></td>
+
                                 <td>
                                     <span class="badge"
-                                        style="background:<?= $color ?>22;color:<?= $color ?>;border:.1rem solid <?= $color ?>55;">
-                                        <?= ucfirst($order['order_status']) ?>
+                                        style="background:#3498db22;color:#3498db;border:.1rem solid #3498db55;">
+                                        <?= e(ucfirst($paymentStatus)) ?>
                                     </span>
                                 </td>
-                                <td style="font-size:1.3rem;">
-                                    <?= date('M d, Y', strtotime($order['created_at'])) ?>
-                                    <small><?= date('h:i A', strtotime($order['created_at'])) ?></small>
+
+                                <td>
+                                    <span class="badge"
+                                        style="background:<?= e($color) ?>22;color:<?= e($color) ?>;border:.1rem solid <?= e($color) ?>55;">
+                                        <?= e(ucfirst($orderStatus)) ?>
+                                    </span>
                                 </td>
+
+                                <td style="font-size:1.3rem;">
+                                    <?php if ($createdAt): ?>
+                                        <?= e(date('M d, Y', strtotime($createdAt))) ?>
+                                        <small><?= e(date('h:i A', strtotime($createdAt))) ?></small>
+                                    <?php else: ?>
+                                        —
+                                    <?php endif; ?>
+                                </td>
+
                                 <td>
                                     <button class="btn-update"
                                         style="padding:.6rem 1.5rem;font-size:1.3rem;border-radius:5rem;display:inline-block;width:auto;"
                                         onclick="openModal(
-                                <?= (int) $order['id'] ?>,
-                                <?= htmlspecialchars(json_encode($order['name']), ENT_QUOTES, 'UTF-8') ?>,
-                                <?= htmlspecialchars(json_encode($order['contact']), ENT_QUOTES, 'UTF-8') ?>,
-                                <?= htmlspecialchars(json_encode($order['fb_link']), ENT_QUOTES, 'UTF-8') ?>,
-                                <?= htmlspecialchars(json_encode($order['address']), ENT_QUOTES, 'UTF-8') ?>,
-                                <?= htmlspecialchars(json_encode($order['product']), ENT_QUOTES, 'UTF-8') ?>,
-                                <?= (float) $order['price'] ?>,
-                                <?= htmlspecialchars(json_encode($order['notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
-                                <?= htmlspecialchars(json_encode($order['order_status']), ENT_QUOTES, 'UTF-8') ?>,
-                                <?= htmlspecialchars(json_encode($order['payment_method'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
-                            )">
+                                            <?= js($id) ?>,
+                                            <?= js($name) ?>,
+                                            <?= js($contact) ?>,
+                                            <?= js($fbLink) ?>,
+                                            <?= js($address) ?>,
+                                            <?= js($product) ?>,
+                                            <?= js($price) ?>,
+                                            <?= js($notes) ?>,
+                                            <?= js($orderStatus) ?>,
+                                            <?= js($paymentMethod) ?>,
+                                            <?= js($paymentStatus) ?>
+                                        )">
                                         <i class="fas fa-eye"></i> View
                                     </button>
                                 </td>
@@ -718,7 +840,11 @@ $statusColors = [
     <div class="modal-overlay" id="orderModal">
         <div class="modal-box">
             <span class="modal-close" onclick="closeModal()">×</span>
-            <h3><i class="fas fa-shopping-bag" style="margin-right:.6rem;"></i> Order Details</h3>
+
+            <h3>
+                <i class="fas fa-shopping-bag" style="margin-right:.6rem;"></i>
+                Order Details
+            </h3>
 
             <div class="detail-row"><span class="lbl">Order ID</span><span class="val" id="d_id"></span></div>
             <div class="detail-row"><span class="lbl">Customer</span><span class="val" id="d_name"></span></div>
@@ -727,14 +853,18 @@ $statusColors = [
             <div class="detail-row"><span class="lbl">Address</span><span class="val" id="d_address"></span></div>
             <div class="detail-row"><span class="lbl">Product</span><span class="val" id="d_product"></span></div>
             <div class="detail-row"><span class="lbl">Price</span><span class="val" id="d_price"></span></div>
-            <div class="detail-row"><span class="lbl">Payment Method</span><span class="val"
-                    id="d_payment_method"></span></div>
+            <div class="detail-row"><span class="lbl">Payment Method</span><span class="val" id="d_payment_method"></span></div>
+            <div class="detail-row"><span class="lbl">Payment Status</span><span class="val" id="d_payment_status"></span></div>
             <div class="detail-row"><span class="lbl">Notes</span><span class="val" id="d_notes"></span></div>
 
             <div class="status-form">
                 <form method="POST" action="">
                     <input type="hidden" name="order_id" id="modal_order_id">
-                    <label for="modal_status"><i class="fas fa-tag"></i> Update Order Status</label>
+
+                    <label for="modal_status">
+                        <i class="fas fa-tag"></i> Update Order Status
+                    </label>
+
                     <select name="order_status" id="modal_status">
                         <option value="pending">Pending</option>
                         <option value="confirmed">Confirmed</option>
@@ -743,6 +873,7 @@ $statusColors = [
                         <option value="delivered">Delivered</option>
                         <option value="cancelled">Cancelled</option>
                     </select>
+
                     <button type="submit" name="update_status" class="btn-update">
                         <i class="fas fa-save"></i> Save Status
                     </button>
@@ -753,6 +884,7 @@ $statusColors = [
                 <form method="POST" action=""
                     onsubmit="return confirm('Are you sure you want to mark this order as cancelled?');">
                     <input type="hidden" name="order_id" id="modal_cancel_order_id">
+
                     <button type="submit" name="cancel_order" class="btn-cancel-order">
                         <i class="fas fa-ban"></i> Mark as Cancelled
                     </button>
@@ -762,21 +894,29 @@ $statusColors = [
     </div>
 
     <script>
-        function openModal(id, name, contact, fb, address, product, price, notes, status, paymentMethod) {
+        function openModal(id, name, contact, fb, address, product, price, notes, status, paymentMethod, paymentStatus) {
             document.getElementById('d_id').textContent = '#' + id;
             document.getElementById('d_name').textContent = name || '—';
             document.getElementById('d_contact').textContent = contact || '—';
-            document.getElementById('d_fb').innerHTML = fb ? '<a href="' + fb + '" target="_blank">' + fb + '</a>' : '—';
+
+            if (fb) {
+                document.getElementById('d_fb').innerHTML = '<a href="' + fb + '" target="_blank">' + fb + '</a>';
+            } else {
+                document.getElementById('d_fb').textContent = '—';
+            }
+
             document.getElementById('d_address').textContent = address || '—';
             document.getElementById('d_product').textContent = product || '—';
             document.getElementById('d_price').textContent = '₱' + parseFloat(price || 0).toFixed(2);
             document.getElementById('d_payment_method').textContent = paymentMethod || '—';
+            document.getElementById('d_payment_status').textContent = paymentStatus || '—';
             document.getElementById('d_notes').textContent = notes || '—';
 
             document.getElementById('modal_order_id').value = id;
             document.getElementById('modal_cancel_order_id').value = id;
 
             const sel = document.getElementById('modal_status');
+
             for (let i = 0; i < sel.options.length; i++) {
                 if (sel.options[i].value === status) {
                     sel.selectedIndex = i;
@@ -792,9 +932,12 @@ $statusColors = [
         }
 
         document.getElementById('orderModal').addEventListener('click', function (e) {
-            if (e.target === this) closeModal();
+            if (e.target === this) {
+                closeModal();
+            }
         });
     </script>
+
 </body>
 
 </html>
