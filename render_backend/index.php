@@ -1,9 +1,319 @@
-<?php
-echo "<h1>Yard Handicraft PayMongo Backend is running</h1>";
-echo "<p>Available endpoints:</p>";
-echo "<ul>";
-echo "<li>/preorder.php</li>";
-echo "<li>/paymongo_webhook.php</li>";
-echo "<li>/success.php</li>";
-echo "<li>/cancel.php</li>";
-echo "</ul>";
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yard Handicraft</title>
+    <meta name="description"
+        content="Handcrafted satin flowers from Davao Region. Pre-order now! Read real testimonials and see why Davao loves our affordable, beautiful satin floral arrangements.">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header>
+        <input type="checkbox" name="" id="toggler">
+        <label for="toggler" class="fas fa-bars" aria-label="Open Navigation"></label>
+        <a href="#" class="logo">Yard Handicraft<span>.</span></a>
+        <nav class="navbar">
+            <a href="#home">Home</a>
+            <a href="#about">About</a>
+            <a href="#products">Products</a>
+            <a href="#testimonials">Testimonials</a>
+            <a href="#contact">Contact</a>
+        </nav>
+    </header>
+
+    <section class="home" id="home">
+        <div class="content">
+            <h3>Satin Flowers</h3>
+            <span>Handcrafted Elegance from Davao</span>
+            <p>Order unique, everlasting satin flowers for any occasion. Pre-order now and bring vibrant, flowering
+                works of art to your home or events—made with love by Davaoeño artisans.</p>
+            <a href="#products" class="btn">Pre-Order Now</a>
+        </div>
+    </section>
+
+    <section class="about" id="about">
+        <h1 class="heading"><span>about</span> us</h1>
+        <div class="row">
+            <div class="video-container">
+                <video src="../images/about-vid.mp4" loop autoplay muted aria-label="About our handicraft"></video>
+                <h3>Best Satin Flower</h3>
+            </div>
+            <div class="content">
+                <h3>Why choose us?</h3>
+                <p>Our satin flower arrangements are more than just decor—they're flowering works of art! Each piece is
+                    carefully handcrafted by skilled locals from Davao Region, ensuring uniqueness and lasting beauty
+                    for your space or celebration.</p>
+                <p>We use only premium materials and creative designs, so your pre-order brings a touch of Davaoeño
+                    pride to your special moments. Experience the artistry and care that set us apart!</p>
+                <a href="#products" class="btn">Learn More</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="icons-container">
+        <div class="icons">
+            <img src="../images/icon-1.png" alt="Free Delivery">
+            <div class="info">
+                <h3>Free delivery</h3>
+                <span>on all pre-orders</span>
+            </div>
+        </div>
+        <div class="icons">
+            <img src="../images/icon-2.png" alt="Returns">
+            <div class="info">
+                <h3>10 days returns</h3>
+                <span>Moneyback guarantee</span>
+            </div>
+        </div>
+        <div class="icons">
+            <img src="../images/icon-3.png" alt="Offers">
+            <div class="info">
+                <h3>Offers & Gifts</h3>
+                <span>on all pre-orders</span>
+            </div>
+        </div>
+
+    </section>
+
+    <section class="products" id="products">
+        <h1 class="heading">latest <span>products</span></h1>
+        <div class="box-container">
+            <div class="box">
+                <span class="discount">-10%</span>
+                <div class="image">
+                    <img src="../images/img-1.jpg" alt="Satin Flower Pot 1">
+                    <div class="icons">
+                        <a href="#" class="fas fa-heart" title="Add to Favorites"></a>
+                        <a href="#preorderModal" class="cart-btn"
+                            onclick="openPreOrder('Satin Flower Pot - Rose Elegance',1)">pre-order</a>
+                    </div>
+                </div>
+                <div class="content">
+                    <h3>Satin Flower Pot - Rose Elegance</h3>
+                    <div class="price">₱1 <span>₱50</span></div>
+                </div>
+            </div>
+            <div class="box">
+                <span class="discount">-15%</span>
+                <div class="image">
+                    <img src="../images/img-2.jpg" alt="Satin Flower Pot 2">
+                    <div class="icons">
+                        <a href="#" class="fas fa-heart" title="Add to Favorites"></a>
+                        <a href="#preorderModal" class="cart-btn"
+                            onclick="openPreOrder('Satin Flower Pot - Davao Delight', 1)">pre-order</a>
+                    </div>
+                </div>
+                <div class="content">
+                    <h3>Satin Flower Pot - Davao Delight</h3>
+                    <div class="price">₱1 <span>₱10</span></div>
+                </div>
+            </div>
+            <div class="box">
+                <span class="discount">-8%</span>
+                <div class="image">
+                    <img src="../images/img-3.jpg" alt="Satin Flower Pot 3">
+                    <div class="icons">
+                        <a href="#" class="fas fa-heart" title="Add to Favorites"></a>
+                        <a href="#preorderModal" class="cart-btn"
+                            onclick="openPreOrder('Satin Flower Pot - Blush Bouquet', 1)">pre-order</a>
+                    </div>
+                </div>
+                <div class="content">
+                    <h3>Satin Flower Pot - Blush Bouquet</h3>
+                    <div class="price">₱1<span>₱100</span></div>
+                </div>
+            </div>
+            <div class="box">
+                <span class="discount">-12%</span>
+                <div class="image">
+                    <img src="../images/img-4.jpg" alt="Satin Flower Pot 4">
+                    <div class="icons">
+                        <a href="#" class="fas fa-heart" title="Add to Favorites"></a>
+                        <a href="#preorderModal" class="cart-btn"
+                            onclick="openPreOrder('Satin Flower Pot - Sunburst', 1)">pre-order</a>
+                    </div>
+                </div>
+                <div class="content">
+                    <h3>Satin Flower Pot - Sunburst</h3>
+                    <div class="price">₱1 <span>₱10</span></div>
+                </div>
+            </div>
+            <div class="box">
+                <span class="discount">-10%</span>
+                <div class="image">
+                    <img src="../images/image-5.png" alt="Satin Flower Pot 5">
+                    <div class="icons">
+                        <a href="#" class="fas fa-heart" title="Add to Favorites"></a>
+                        <a href="#preorderModal" class="cart-btn"
+                            onclick="openPreOrder('Satin Flower Pot - Lavender Dream', 1200)">pre-order</a>
+                    </div>
+                </div>
+                <div class="content">
+                    <h3>Satin Flower Pot - Lavender Dream</h3>
+                    <div class="price">₱1,200 <span>₱1,340</span></div>
+                </div>
+            </div>
+    </section>
+
+
+    <div id="preorderModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closePreOrder()">&times;</span>
+            <h2>Pre-Order: <span id="productTitle">Product Name</span></h2>
+            <form action="https://yardhandicraft.onrender.com/preorder.php" method="POST" id="preOrderForm">
+                <input type="hidden" name="product" id="modalProduct" required>
+                <input type="hidden" name="price" id="modalPrice" required>
+
+                <label for="orderName">Full Name</label>
+                <input type="text" class="box" id="orderName" name="name" required>
+
+                <label for="orderEmail">Email Address</label>
+                <input type="email" class="box" id="orderEmail" name="email" required>
+
+                <label for="orderAddress">Delivery Address</label>
+                <input type="text" class="box" id="orderAddress" name="address" required>
+
+                <label for="orderContact">Contact Number</label>
+                <input type="text" class="box" id="orderContact" name="contact" required>
+
+                <label for="orderFb">Facebook Profile Link</label>
+                <input type="text" class="box" id="orderFb" name="fb_link" required>
+
+                <label for="orderNotes">Notes/Requests</label>
+                <textarea class="box" id="orderNotes" name="notes"></textarea>
+
+                <button type="submit" class="btn" style="width:100%;text-align:center;margin-top:.5rem;">
+                    Proceed to Payment
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ── Open / Close modal ────────────────────────────────────────────────────
+        function openPreOrder(product, price) {
+            document.getElementById('preorderModal').style.display = 'block';
+            document.getElementById('productTitle').textContent = product;
+            document.getElementById('modalProduct').value = product;
+            document.getElementById('modalPrice').value = price;
+            // Clear specific logic for payment if it was here
+        }
+        function closePreOrder() {
+            document.getElementById('preorderModal').style.display = 'none';
+        }
+
+        // ── Close on outside click ────────────────────────────────────────────────
+        window.onclick = function (event) {
+            var modal = document.getElementById('preorderModal');
+            if (event.target === modal) modal.style.display = 'none';
+        };
+    </script>
+
+    <section class="review" id="testimonials">
+        <h1 class="heading"><span>Testimonials</span></h1>
+        <div class="box-container">
+            <div class="box">
+                <div class="stars">
+                    <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i
+                        class="fas fa-star"></i><i class="fas fa-star"></i>
+                </div>
+                <p>"I ordered a satin flower centerpiece for my daughter's graduation and it was absolutely perfect. The
+                    arrangement looked so real and added a special touch to our table."</p>
+                <div class="user">
+                    <img src="../images/picwww.jpg" alt="Testimonial 1">
+                    <div class="user-info">
+                        <h3>Mike Balaga</h3>
+                        <span>Tagum City, Davao del Norte</span>
+                    </div>
+                </div>
+                <span class="fas fa-quote-right"></span>
+            </div>
+            <div class="box">
+                <div class="stars">
+                    <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i
+                        class="fas fa-star"></i><i class="fas fa-star"></i>
+                </div>
+                <p>"I pre-ordered a bouquet for my mom in Davao City and she loved the vibrant satin flowers. Thank you
+                    for the wonderful service and fast delivery!"</p>
+                <div class="user">
+                    <img src="../images/jhzz.jpg" alt="Testimonial 2">
+                    <div class="user-info">
+                        <h3>Jhazmin Nepomuceno</h3>
+                        <span>Davao City, Davao del Sur</span>
+                    </div>
+                </div>
+                <span class="fas fa-quote-right"></span>
+            </div>
+            <div class="box">
+                <div class="stars">
+                    <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i
+                        class="fas fa-star"></i><i class="fas fa-star"></i>
+                </div>
+                <p>"I'm impressed by the quality and detail of the satin flowers. Customer service was very helpful and
+                    the flowers arrived safely to Panabo. Highly recommended!"</p>
+                <div class="user">
+                    <img src="../images/pic3.jpg" alt="Testimonial 3">
+                    <div class="user-info">
+                        <h3>Rolly Abregoso</h3>
+                        <span>Panabo City, Davao del Norte</span>
+                    </div>
+                </div>
+                <span class="fas fa-quote-right"></span>
+            </div>
+        </div>
+    </section>
+
+    <section class="contact" id="contact">
+        <h1 class="heading"><span>Contact</span> us</h1>
+        <div class="row">
+            <form action="../backend/contact.php" method="POST">
+                <input type="text" class="box" placeholder="Name" name="name" required>
+                <input type="text" class="box" placeholder="Facebook Profile Link" name="fb_link" required>
+                <input type="number" class="box" placeholder="Number" name="number" required>
+                <textarea class="box" placeholder="Message" name="message" required></textarea>
+                <input type="submit" value="Send Message" class="btn">
+            </form>
+            <div class="image">
+                <img src="../images/contact-img.svg" alt="Contact Illustration">
+            </div>
+        </div>
+    </section>
+
+    <section class="footer">
+        <div class="box-container">
+            <div class="box">
+                <h3>quick links</h3>
+                <a href="#home">home</a>
+                <a href="#about">about</a>
+                <a href="#products">products</a>
+                <a href="#testimonials">testimonials</a>
+                <a href="#contact">contact</a>
+            </div>
+            <div class="box">
+                <h3>Locations</h3>
+                <a href="#">Davao City</a>
+                <a href="#">Tagum City</a>
+                <a href="#">Digos City</a>
+                <a href="#">Panabo City</a>
+                <a href="#">Mati City</a>
+            </div>
+            <div class="box">
+                <h3>Contact Info</h3>
+                <a href="#">+639266092122</a>
+                <a href="https://www.facebook.com/profile.php?id=61571860299181"
+                    target="_blank">facebook.com/yardhandicraft</a>
+                <a href="#">Bunawan, Davao City</a>
+
+            </div>
+        </div>
+        <div class="credit">
+            &copy; 2025 Yard Handicraft. All rights reserved
+        </div>
+    </section>
+</body>
+
+</html>
