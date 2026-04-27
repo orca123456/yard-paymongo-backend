@@ -415,7 +415,7 @@ chatForm.addEventListener('submit', async (e) => {
     try {
         const response = await fetch('ai_assistant.php', {
             method: 'POST',
-            headers: { 'Content-Type: application/json' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: message })
         });
         const data = await response.json();

@@ -1178,9 +1178,10 @@ textarea.form-input { min-height:12rem; resize:vertical; }
     font-size: 2.8rem;
     cursor: pointer;
     box-shadow: 0 10px 25px rgba(196,122,138,0.4);
-    z-index: 1000;
+    z-index: 9999;
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
     border: 3px solid #fff;
+    pointer-events: auto;
 }
 .ai-chat-bubble:hover {
     transform: scale(1.1) rotate(5deg);
@@ -1203,11 +1204,12 @@ textarea.form-input { min-height:12rem; resize:vertical; }
     display: none;
     flex-direction: column;
     overflow: hidden;
-    z-index: 1000;
+    z-index: 9999;
     border: 1px solid var(--border);
     font-family: 'Poppins', sans-serif;
     transform-origin: bottom right;
     animation: chatOpen 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+    pointer-events: auto;
 }
 @keyframes chatOpen {
     from { opacity: 0; transform: scale(0.8) translateY(20px); }
