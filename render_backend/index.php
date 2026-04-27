@@ -1,3 +1,83 @@
+<?php
+/**
+ * YardHandicraft Homepage
+ * Best Sellers section powered by Smart Recommendation Engine
+ */
+$bestSellers = [];
+$allProducts = [];
+$dbConnected = false;
+
+if (getenv("DATABASE_URL")) {
+    try {
+        require_once 'db.php';
+        $dbConnected = true;
+    } catch (Exception $e) {
+        // DB unavailable, continue without recommendations
+    }
+}
+
+if ($dbConnected && isset($pdo)) {
+    // Ensure products table exists
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS products (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(200) NOT NULL,
+                description TEXT,
+                price NUMERIC(10, 2) DEFAULT 0,
+                old_price NUMERIC(10, 2) DEFAULT 0,
+                category VARCHAR(100) DEFAULT 'Satin Flowers',
+                image VARCHAR(255),
+                stock INTEGER DEFAULT 10,
+                discount_label VARCHAR(20),
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        ");
+    } catch (PDOException $e) {
+        // Table creation failed, continue without recommendations
+    }
+
+    // Fetch best sellers (by order count from preorders table)
+    try {
+        $orderCountsSql = "(SELECT product, SUM(COALESCE(quantity, 1)) as total_ordered FROM preorders WHERE order_status NOT IN ('cancelled') GROUP BY product)";
+        $bsStmt = $pdo->query("
+            SELECT p.id, p.name, p.description, p.price, p.old_price, p.category, p.image, p.stock, p.discount_label,
+                   COALESCE(oc.total_ordered, 0) as total_ordered
+            FROM products p
+            LEFT JOIN $orderCountsSql oc ON p.name = oc.product
+            WHERE p.stock > 0
+            ORDER BY total_ordered DESC, p.created_at DESC
+            LIMIT 8
+        ");
+        $bestSellers = $bsStmt->fetchAll();
+    } catch (PDOException $e) {
+        error_log('Best sellers query error: ' . $e->getMessage());
+        $bestSellers = [];
+    }
+
+    // Fetch all products for product grid
+    try {
+        $allStmt = $pdo->query("SELECT id, name FROM products WHERE stock > 0 ORDER BY id ASC");
+        $allProducts = $allStmt->fetchAll();
+    } catch (PDOException $e) {
+        $allProducts = [];
+    }
+}
+
+// Helper to find product ID by name
+function findProductId($allProducts, $name) {
+    foreach ($allProducts as $p) {
+        if ($p['name'] === $name) {
+            return (int) $p['id'];
+        }
+    }
+    return 0;
+}
+
+function escHtml($val) {
+    return htmlspecialchars((string) ($val ?? ''), ENT_QUOTES, 'UTF-8');
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -37,6 +117,48 @@
 </div>
 </div>
 </section>
+
+<?php if (!empty($bestSellers)): ?>
+<!-- Best Sellers - Smart Recommendation Engine -->
+<section class="best-sellers-section" id="best-sellers">
+<div class="text-center reveal">
+<div class="rec-ai-badge"><i class="fas fa-fire"></i> Trending Now</div>
+<span class="section-badge">Most Popular</span>
+<h2 class="section-title">Best Sellers</h2>
+<p class="section-subtitle">Our most loved handcrafted products based on real customer orders.</p>
+</div>
+<div class="product-grid rec-grid reveal">
+<?php foreach ($bestSellers as $bs):
+    $bsId = (int) $bs['id'];
+    $bsName = escHtml($bs['name']);
+    $bsDesc = escHtml($bs['description']);
+    $bsPrice = (float) $bs['price'];
+    $bsOldPrice = (float) $bs['old_price'];
+    $bsCategory = escHtml($bs['category'] ?? 'Handmade');
+    $bsImage = escHtml($bs['image'] ?? 'images/img-1.jpg');
+    $bsDiscount = escHtml($bs['discount_label'] ?? '');
+    $bsTotalOrdered = (int) ($bs['total_ordered'] ?? 0);
+    $bsPriceFormatted = '₱' . number_format($bsPrice, 0);
+    $bsOldPriceFormatted = $bsOldPrice > 0 ? '₱' . number_format($bsOldPrice, 0) : '';
+?>
+<div class="product-card rec-card">
+<?php if ($bsDiscount): ?><span class="badge-discount"><?= $bsDiscount ?></span><?php endif; ?>
+<?php if ($bsTotalOrdered > 0): ?><span class="badge-sold"><i class="fas fa-fire"></i> <?= $bsTotalOrdered ?> Sold</span><?php endif; ?>
+<div class="img-wrap"><img src="<?= $bsImage ?>" alt="<?= $bsName ?>"></div>
+<div class="card-body">
+<span class="rec-category-badge"><i class="fas fa-tag"></i> <?= $bsCategory ?></span>
+<h3><?= $bsName ?></h3>
+<p class="card-desc"><?= $bsDesc ?></p>
+<div class="card-footer">
+<span class="price"><?= $bsPriceFormatted ?><?php if ($bsOldPriceFormatted): ?> <span class="old"><?= $bsOldPriceFormatted ?></span><?php endif; ?></span>
+<a href="product.php?id=<?= $bsId ?>" class="btn-order">View Product</a>
+</div>
+</div>
+</div>
+<?php endforeach; ?>
+</div>
+</section>
+<?php endif; ?>
 
 <section class="products-section" id="products">
 <div class="text-center reveal">
