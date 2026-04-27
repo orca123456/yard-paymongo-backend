@@ -155,8 +155,18 @@ $countStmt->execute([':status' => 'cancelled']);
 $cancelledCount = (int) $countStmt->fetchColumn();
 
 // Revenue: sum price*quantity for paid + completed orders
-$revenueStmt = $pdo->query("SELECT COALESCE(SUM(price * COALESCE(quantity, 1)), 0) FROM preorders WHERE order_status IN ('paid', 'completed')");
-$totalRevenue = (float) $revenueStmt->fetchColumn();
+try {
+    $revenueStmt = $pdo->query("SELECT COALESCE(SUM(price * COALESCE(quantity, 1)), 0) FROM preorders WHERE order_status IN ('paid', 'completed')");
+    $totalRevenue = (float) $revenueStmt->fetchColumn();
+} catch (PDOException $e) {
+    // Fallback if quantity column doesn't exist yet
+    try {
+        $revenueStmt = $pdo->query("SELECT COALESCE(SUM(price), 0) FROM preorders WHERE order_status IN ('paid', 'completed')");
+        $totalRevenue = (float) $revenueStmt->fetchColumn();
+    } catch (PDOException $e2) {
+        $totalRevenue = 0;
+    }
+}
 
 // Contacts / customer messages
 try {
