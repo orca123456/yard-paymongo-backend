@@ -361,5 +361,103 @@ var revealEls=document.querySelectorAll('.reveal,.reveal-left,.reveal-right');
 var observer=new IntersectionObserver(function(entries){entries.forEach(function(entry){if(entry.isIntersecting){entry.target.classList.add('visible');observer.unobserve(entry.target);}});},{threshold:0.15});
 revealEls.forEach(function(el){observer.observe(el);});
 </script>
+<!-- AI Gift Stylist Chat -->
+<div class="ai-chat-bubble" id="aiChatBubble" title="Need a gift suggestion?">
+    <i class="fas fa-magic"></i>
+</div>
+
+<div class="ai-chat-window" id="aiChatWindow">
+    <div class="chat-header">
+        <div class="chat-header-info">
+            <i class="fas fa-brain"></i>
+            <div>
+                <h4>AI Gift Stylist</h4>
+                <p>Always online</p>
+            </div>
+        </div>
+        <div class="chat-close" id="aiChatClose">&times;</div>
+    </div>
+    <div class="chat-messages" id="aiChatMessages">
+        <div class="msg msg-ai">Hi there! I'm your YardHandicraft Stylist. Need help finding the perfect handcrafted gift? Ask me anything!</div>
+    </div>
+    <form class="chat-input-area" id="aiChatForm">
+        <input type="text" class="chat-input" id="aiChatInput" placeholder="Type your message..." autocomplete="off">
+        <button type="submit" class="btn-chat-send">
+            <i class="fas fa-paper-plane"></i>
+        </button>
+    </form>
+</div>
+
+<script>
+// AI Chat Logic
+const bubble = document.getElementById('aiChatBubble');
+const windowChat = document.getElementById('aiChatWindow');
+const closeChat = document.getElementById('aiChatClose');
+const chatForm = document.getElementById('aiChatForm');
+const chatInput = document.getElementById('aiChatInput');
+const chatMessages = document.getElementById('aiChatMessages');
+
+bubble.addEventListener('click', () => {
+    windowChat.style.display = 'flex';
+    bubble.style.display = 'none';
+});
+
+closeChat.addEventListener('click', () => {
+    windowChat.style.display = 'none';
+    bubble.style.display = 'flex';
+});
+
+function addMessage(text, role) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `msg msg-${role}`;
+    msgDiv.textContent = text;
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function showTyping() {
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'msg msg-ai typing-msg';
+    typingDiv.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+    chatMessages.appendChild(typingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return typingDiv;
+}
+
+chatForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const message = chatInput.value.trim();
+    if (!message) return;
+
+    // Add user message
+    addMessage(message, 'user');
+    chatInput.value = '';
+
+    // Show typing
+    const typingIndicator = showTyping();
+
+    try {
+        const response = await fetch('ai_assistant.php', {
+            method: 'POST',
+            headers: { 'Content-Type: application/json' },
+            body: JSON.stringify({ message: message })
+        });
+        const data = await response.json();
+        
+        typingIndicator.remove();
+        
+        if (data.reply) {
+            addMessage(data.reply, 'ai');
+        } else {
+            addMessage("I'm sorry, I encountered an error. Please try again.", 'ai');
+        }
+    } catch (err) {
+        typingIndicator.remove();
+        addMessage("Connection error. Please check your internet.", 'ai');
+        console.error(err);
+    }
+});
+</script>
 </body>
 </html>
+
