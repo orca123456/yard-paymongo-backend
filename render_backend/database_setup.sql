@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS preorders (
     address TEXT,
     product VARCHAR(150),
     price NUMERIC(10, 2) DEFAULT 0,
+    quantity INTEGER DEFAULT 1,
     notes TEXT,
     payment_method VARCHAR(100),
     order_status VARCHAR(30) DEFAULT 'pending',
@@ -25,7 +26,17 @@ CREATE TABLE IF NOT EXISTS preorders (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS contacts (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    fb_link TEXT,
+    number VARCHAR(50),
+    message TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 ALTER TABLE preorders ADD COLUMN IF NOT EXISTS email VARCHAR(150);
+ALTER TABLE preorders ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1;
 ALTER TABLE preorders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
 ALTER TABLE preorders ADD COLUMN IF NOT EXISTS paymongo_checkout_id VARCHAR(150);
 ALTER TABLE preorders ADD COLUMN IF NOT EXISTS paymongo_payment_id VARCHAR(150);

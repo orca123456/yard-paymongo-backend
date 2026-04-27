@@ -24,6 +24,7 @@ try {
             address TEXT,
             product VARCHAR(150),
             price NUMERIC(10, 2) DEFAULT 0,
+            quantity INTEGER DEFAULT 1,
             notes TEXT,
             payment_method VARCHAR(100),
             order_status VARCHAR(30) DEFAULT 'pending',
@@ -36,7 +37,19 @@ try {
         )
     ");
 
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS contacts (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(150) NOT NULL,
+            fb_link TEXT,
+            number VARCHAR(50),
+            message TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    ");
+
     $pdo->exec("ALTER TABLE preorders ADD COLUMN IF NOT EXISTS email VARCHAR(150)");
+    $pdo->exec("ALTER TABLE preorders ADD COLUMN IF NOT EXISTS quantity INTEGER DEFAULT 1");
     $pdo->exec("ALTER TABLE preorders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ");
     $pdo->exec("ALTER TABLE preorders ADD COLUMN IF NOT EXISTS paymongo_checkout_id VARCHAR(150)");
     $pdo->exec("ALTER TABLE preorders ADD COLUMN IF NOT EXISTS paymongo_payment_id VARCHAR(150)");
@@ -72,7 +85,8 @@ try {
     }
 
 } catch (PDOException $e) {
-    $error = $e->getMessage();
+    error_log('Create admin error: ' . $e->getMessage());
+    $error = 'Setup failed. Please check server logs.';
 }
 ?>
 

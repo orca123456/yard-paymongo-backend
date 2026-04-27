@@ -42,6 +42,7 @@ try {
             address TEXT,
             product VARCHAR(150),
             price NUMERIC(10, 2) DEFAULT 0,
+            quantity INTEGER DEFAULT 1,
             notes TEXT,
             payment_method VARCHAR(100),
             order_status VARCHAR(30) DEFAULT 'pending',

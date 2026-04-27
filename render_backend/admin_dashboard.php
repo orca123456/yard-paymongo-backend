@@ -10,8 +10,8 @@ require_once 'db.php';
 
 $statusMsg = '';
 
-$allowedStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
-$allowedFilters = ['all', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+$allowedStatuses = ['pending', 'paid', 'processing', 'ready_for_pickup', 'shipped', 'completed', 'cancelled'];
+$allowedFilters = ['all', 'pending', 'paid', 'processing', 'ready_for_pickup', 'shipped', 'completed', 'cancelled'];
 
 function e($value)
 {
@@ -34,23 +34,27 @@ try {
         CREATE TABLE IF NOT EXISTS preorders (
             id SERIAL PRIMARY KEY,
             name VARCHAR(150) NOT NULL,
+            email VARCHAR(150),
             contact VARCHAR(50),
             fb_link TEXT,
             address TEXT,
             product VARCHAR(150),
             price NUMERIC(10, 2) DEFAULT 0,
+            quantity INTEGER DEFAULT 1,
             notes TEXT,
             payment_method VARCHAR(100),
             order_status VARCHAR(30) DEFAULT 'pending',
             payment_status VARCHAR(30) DEFAULT 'pending',
             paymongo_checkout_id VARCHAR(150),
             paymongo_payment_id VARCHAR(150),
+            paid_at TIMESTAMPTZ,
             created_at TIMESTAMPTZ DEFAULT NOW(),
             updated_at TIMESTAMPTZ DEFAULT NOW()
         )
     ");
 } catch (PDOException $e) {
-    die("Table setup failed: " . $e->getMessage());
+    error_log("Table setup failed: " . $e->getMessage());
+    die("Service temporarily unavailable.");
 }
 
 // Handle status update
@@ -138,21 +142,38 @@ $countStmt = $pdo->prepare("SELECT COUNT(*) FROM preorders WHERE order_status = 
 $countStmt->execute([':status' => 'pending']);
 $pendingCount = (int) $countStmt->fetchColumn();
 
+$countStmt->execute([':status' => 'paid']);
+$paidCount = (int) $countStmt->fetchColumn();
+
 $countStmt->execute([':status' => 'processing']);
 $processingCount = (int) $countStmt->fetchColumn();
 
-$countStmt->execute([':status' => 'delivered']);
-$deliveredCount = (int) $countStmt->fetchColumn();
+$countStmt->execute([':status' => 'completed']);
+$completedCount = (int) $countStmt->fetchColumn();
 
 $countStmt->execute([':status' => 'cancelled']);
 $cancelledCount = (int) $countStmt->fetchColumn();
 
+// Revenue: sum price*quantity for paid + completed orders
+$revenueStmt = $pdo->query("SELECT COALESCE(SUM(price * COALESCE(quantity, 1)), 0) FROM preorders WHERE order_status IN ('paid', 'completed')");
+$totalRevenue = (float) $revenueStmt->fetchColumn();
+
+// Contacts / customer messages
+try {
+    $contactsStmt = $pdo->query("SELECT * FROM contacts ORDER BY created_at DESC LIMIT 50");
+    $contactMessages = $contactsStmt->fetchAll();
+} catch (PDOException $e) {
+    $contactMessages = [];
+}
+$contactCount = count($contactMessages);
+
 $statusColors = [
     'pending' => '#f39c12',
-    'confirmed' => '#3498db',
+    'paid' => '#3498db',
     'processing' => '#9b59b6',
-    'shipped' => '#1abc9c',
-    'delivered' => '#27ae60',
+    'ready_for_pickup' => '#1abc9c',
+    'shipped' => '#2980b9',
+    'completed' => '#27ae60',
     'cancelled' => '#e74c3c',
 ];
 
@@ -661,10 +682,26 @@ $adminUsername = $_SESSION['admin_username'] ?? 'Admin';
             </div>
 
             <div class="stat-card">
+                <div class="icon" style="background:rgba(39,174,96,.1);color:#27ae60;"><i class="fas fa-peso-sign"></i></div>
+                <div>
+                    <h4>Paid Revenue</h4>
+                    <h2>₱<?= number_format($totalRevenue, 2) ?></h2>
+                </div>
+            </div>
+
+            <div class="stat-card">
                 <div class="icon orange"><i class="fas fa-clock"></i></div>
                 <div>
                     <h4>Pending</h4>
                     <h2><?= $pendingCount ?></h2>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="icon" style="background:rgba(52,152,219,.1);color:#3498db;"><i class="fas fa-credit-card"></i></div>
+                <div>
+                    <h4>Paid</h4>
+                    <h2><?= $paidCount ?></h2>
                 </div>
             </div>
 
@@ -679,8 +716,8 @@ $adminUsername = $_SESSION['admin_username'] ?? 'Admin';
             <div class="stat-card">
                 <div class="icon green"><i class="fas fa-check-circle"></i></div>
                 <div>
-                    <h4>Delivered</h4>
-                    <h2><?= $deliveredCount ?></h2>
+                    <h4>Completed</h4>
+                    <h2><?= $completedCount ?></h2>
                 </div>
             </div>
 
@@ -835,6 +872,47 @@ $adminUsername = $_SESSION['admin_username'] ?? 'Admin';
             </table>
         </div>
 
+        <!-- ── Contact Messages ──────────────────────────── -->
+        <div class="table-wrap" style="margin-top:3rem;">
+            <h2 style="font-size:2rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:.8rem;">
+                <i class="fas fa-envelope" style="color:#3498db;"></i>
+                Customer Messages
+                <span style="background:rgba(52,152,219,.1);color:#3498db;font-size:1.2rem;padding:.3rem 1rem;border-radius:5rem;"><?= $contactCount ?></span>
+            </h2>
+            <table class="orders-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Contact</th>
+                        <th>Facebook</th>
+                        <th>Message</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($contactMessages)): ?>
+                        <tr><td colspan="5" style="text-align:center;padding:3rem;color:#999;">No customer messages yet.</td></tr>
+                    <?php else: ?>
+                        <?php foreach ($contactMessages as $msg): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($msg['name']) ?></td>
+                                <td><?= htmlspecialchars($msg['number'] ?? '—') ?></td>
+                                <td>
+                                    <?php if (!empty($msg['fb_link'])): ?>
+                                        <a href="<?= htmlspecialchars($msg['fb_link']) ?>" target="_blank" style="color:#3498db;">View Profile</a>
+                                    <?php else: ?>
+                                        —
+                                    <?php endif; ?>
+                                </td>
+                                <td style="max-width:30rem;white-space:normal;line-height:1.5;"><?= htmlspecialchars($msg['message'] ?? '') ?></td>
+                                <td><?= date('M d, Y h:i A', strtotime($msg['created_at'])) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
     </div>
 
     <div class="modal-overlay" id="orderModal">
@@ -867,10 +945,11 @@ $adminUsername = $_SESSION['admin_username'] ?? 'Admin';
 
                     <select name="order_status" id="modal_status">
                         <option value="pending">Pending</option>
-                        <option value="confirmed">Confirmed</option>
+                        <option value="paid">Paid</option>
                         <option value="processing">Processing</option>
+                        <option value="ready_for_pickup">Ready for Pickup</option>
                         <option value="shipped">Shipped</option>
-                        <option value="delivered">Delivered</option>
+                        <option value="completed">Completed</option>
                         <option value="cancelled">Cancelled</option>
                     </select>
 

@@ -2,7 +2,8 @@
 $databaseUrl = getenv("DATABASE_URL");
 
 if (!$databaseUrl) {
-    die("DATABASE_URL is not set in Render environment variables.");
+    http_response_code(503);
+    exit('Service temporarily unavailable. Please try again later.');
 }
 
 $url = parse_url($databaseUrl);
@@ -28,6 +29,8 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ]);
 } catch (PDOException $e) {
-    die("Database connection failed: " . $e->getMessage());
+    error_log("Database connection failed: " . $e->getMessage());
+    http_response_code(503);
+    exit('Service temporarily unavailable. Please try again later.');
 }
 ?>
